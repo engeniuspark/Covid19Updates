@@ -331,10 +331,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 btnApply.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        checkCondition(spinner1.getSelectedItem().toString(),
-                                spinner2.getSelectedItem().toString(),
-                                editText.getText().toString());
-                        dialog.dismiss();
+                        if (!editText.getText().toString().isEmpty()) {
+                            checkCondition(spinner1.getSelectedItem().toString(),
+                                    spinner2.getSelectedItem().toString(),
+                                    editText.getText().toString());
+                            dialog.dismiss();
+                        }else{
+                            Toast.makeText(context, "Please enter number.", Toast.LENGTH_LONG).show();
+                        }
                     }
                 });
                 btnCancel.setOnClickListener(new View.OnClickListener() {
