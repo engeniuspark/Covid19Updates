@@ -7,8 +7,10 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
+import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.view.Window;
 import android.widget.ArrayAdapter;
@@ -31,10 +33,16 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.covid19updates.R;
 import com.example.covid19updates.adapters.CountryRVAdapter;
 import com.example.covid19updates.datamodels.Countries;
+import com.example.covid19updates.datamodels.SummaryModel;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.gson.Gson;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -85,7 +93,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 Context.MODE_PRIVATE);
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        checkLocationPermission();
+        requestLocationPermission();
 
         tvTotalCasesCount = findViewById(R.id.tvTotalCasesCount);
         tvTotalRecovered = findViewById(R.id.tvTotalRecovered);
@@ -108,14 +116,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         viewModel = ViewModelProviders.of(context).get(MainViewModel.class);
         viewModel.init();
 
-        getDataFromViewModel();
+        if (isNetworkConnected()) {
+            getDataFromViewModel();
+        }else{
+            Toast.makeText(this, "Please turn on iternet connection.", Toast.LENGTH_LONG).show();
+        }
 
+    }
+
+    private boolean isNetworkConnected() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+
+        return cm.getActiveNetworkInfo() != null && cm.getActiveNetworkInfo().isConnected();
     }
 
     private void setupRecyclerView(ArrayList<Countries> countriesArrayList) {
         if (adapter == null) {
             adapter = new CountryRVAdapter(countriesArrayList);
-            recyclerView.setLayoutManager(new LinearLayoutManager(this));
+            recyclerView.setLayoutManager(new LinearLayoutManager(context));
             recyclerView.setAdapter(adapter);
             recyclerView.setItemAnimator(new DefaultItemAnimator());
         } else {
@@ -140,7 +158,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     protected void onResume() {
         super.onResume();
-
         handler.postDelayed(new Runnable() {
             public void run() {
                 getDataFromViewModel();
@@ -149,7 +166,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }, 120000); //
     }
 
-    private void checkLocationPermission() {
+    private void requestLocationPermission() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
                 && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             // reuqest for permission
@@ -209,7 +226,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         }
                     });
                 } else {
-                    Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Permission denied", Toast.LENGTH_LONG).show();
                 }
                 break;
             }
@@ -222,39 +239,54 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     private void getDataFromViewModel() {
-        viewModel.getMainRepository().observe(context, summaryModel -> {
+            viewModel.getMainRepository().observe(context, summaryModel -> {
 
-            if (!summaryModel.getContries().isEmpty()){
-               llProgressbarContainer.setVisibility(View.GONE);
-            }
-            countryModelList = summaryModel.getContries();
 
-            Collections.sort(countryModelList, Countries.totalCases);
-            int itemPos = 0;
-            int totalCases = 0;
-            int deaths = 0;
-            int recovered = 0;
-            for (Countries countryModel : countryModelList) {
-                if (countryModel.getCountryName().equalsIgnoreCase(countryName)) {
-                    itemPos = countryModelList.indexOf(countryModel);
-                    saveCurrentLocationPosition(itemPos);
-                    this.countryModel = countryModel;
+
+                if (!summaryModel.getContries().isEmpty()) {
+                    llProgressbarContainer.setVisibility(View.GONE);
+                    tvTotalCasesHeader.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_descending, 0, 0, 0);
+                    tvDeathsHeader.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_descending, 0, 0, 0);
+                    tvRecoveredHeader.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_descending, 0, 0, 0);
                 }
-                totalCases += countryModel.getTotalConfirmed();
-                deaths += countryModel.getTotalDeaths();
-                recovered += countryModel.getTotalRecovered();
-            }
-            countryModelList.remove(itemPos);
-            countryModelList.add(0, countryModel);
+                if (summaryModel != null) {
+                    countryModelList = summaryModel.getContries();
+                }
+                else{
+                    Gson gson = new Gson();
+                    summaryModel = gson.fromJson(readJSONFromAsset(),SummaryModel.class);
+                    countryModelList = summaryModel.getContries();
+                }
 
-            tvTotalCasesCount.setText(String.valueOf(totalCases));
-            tvTotalDeaths.setText(String.valueOf(deaths));
-            tvTotalRecovered.setText(String.valueOf(recovered));
+                Collections.sort(countryModelList, Countries.totalCases);
+                int itemPos = 0;
+                int totalCases = 0;
+                int deaths = 0;
+                int recovered = 0;
+                System.out.println("CountryName: " + countryName);
+                for (Countries countryModel : countryModelList) {
+                    if (countryName != null && !countryName.isEmpty()) {
+                        if (countryModel.getCountryName().equalsIgnoreCase(countryName)) {
+                            itemPos = countryModelList.indexOf(countryModel);
+                            saveCurrentLocationPosition(itemPos);
+                            this.countryModel = countryModel;
+                        }
+                    }
+                    totalCases += countryModel.getTotalConfirmed();
+                    deaths += countryModel.getTotalDeaths();
+                    recovered += countryModel.getTotalRecovered();
+                }
+                if (countryName != null && !countryName.isEmpty()) {
+                    countryModelList.remove(itemPos);
+                    countryModelList.add(0, countryModel);
+                }
 
-//            adapter = new CountryRVAdapter(summaryModel.getContries());
-//            recyclerView.setAdapter(adapter);
-            setupRecyclerView(countryModelList);
-        });
+                tvTotalCasesCount.setText(String.valueOf(totalCases));
+                tvTotalDeaths.setText(String.valueOf(deaths));
+                tvTotalRecovered.setText(String.valueOf(recovered));
+
+                setupRecyclerView(countryModelList);
+            });
     }
 
     private void saveCurrentLocationPosition(int itemPos) {
@@ -395,12 +427,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    Observer<ArrayList<Countries>> countryListUpdateObserver = new Observer<ArrayList<Countries>>() {
-        private Countries countryModel;
-
-        @Override
-        public void onChanged(ArrayList<Countries> countriesArrayList) {
-
+    public String readJSONFromAsset() {
+        String json = null;
+        try {
+            InputStream is = getAssets().open("CovidSampleData.json");
+            int size = is.available();
+            byte[] buffer = new byte[size];
+            is.read(buffer);
+            is.close();
+            json = new String(buffer, "UTF-8");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return null;
         }
-    };
+        return json;
+    }
 }

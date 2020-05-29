@@ -1,5 +1,8 @@
 package com.example.covid19updates.ui.homescreen;
 
+import android.util.Log;
+import android.widget.Toast;
+
 import androidx.lifecycle.MutableLiveData;
 
 import com.example.covid19updates.datamodels.SummaryModel;
@@ -9,6 +12,8 @@ import com.example.covid19updates.retrofit.RetrofitClient;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+
+import static androidx.constraintlayout.widget.Constraints.TAG;
 
 public class MainRepository {
     private static MainRepository mainRepository;
@@ -35,18 +40,12 @@ public class MainRepository {
             public void onResponse(Call<SummaryModel> call, Response<SummaryModel> response) {
                 if (response.isSuccessful()) {
                     countryLiveData.setValue(response.body());
-//                    countryModelList = response.body().getContries();
-                } else {
-                    countryLiveData.setValue(null);
-//                    Toast.makeText(this, "You have reached maximum request limit.", Toast.LENGTH_LONG).show();
                 }
             }
 
             @Override
             public void onFailure(Call<SummaryModel> call, Throwable t) {
-//                llProgressbarContainer.setVisibility(View.GONE);
-//                Log.d(TAG, "Countrylist: " + t.getMessage());
-                countryLiveData.setValue(null);
+                Log.d("MainRepo: ", "Error: " + t.getMessage());
             }
         });
         return countryLiveData;

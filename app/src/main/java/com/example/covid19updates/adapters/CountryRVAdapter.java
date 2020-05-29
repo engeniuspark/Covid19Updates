@@ -34,7 +34,6 @@ public class CountryRVAdapter extends RecyclerView.Adapter<CountryRVAdapter.View
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-
         Countries countryModel = countryNamesList.get(position);
 
         if(position == 0){
